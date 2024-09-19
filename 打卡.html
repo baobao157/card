@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打卡系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 300px;
+            margin: 100px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label, input, button {
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #result, #history {
+            margin-top: 20px;
+        }
+
+        .delete-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+
+        #history {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>打卡系统</h1>
+    <form id="punchForm">
+        <label for="date">打卡日期：</label>
+        <input type="date" id="date" required>
+
+        <label for="morningTime">早上打卡时间：</label>
+        <input type="time" id="morningTime">
+
+        <label for="eveningTime">晚上打卡时间：</label>
+        <input type="time" id="eveningTime">
+
+        <button type="submit">提交</button>
+    </form>
+
+    <div id="result"></div>
+    <button id="toggleHistory">查看打卡历史</button>
+    <button id="calculateMonth">计算当月迟到/加班</button>
+    <div id="history"></div>
+    <div id="monthlySummary"></div>
+</div>
+
+<script>
+    // 监听表单提交事件
+    document.getElementById('punchForm').addEventListener('submit', function(event) {
+        event.preventDefault();  // 阻止默认的表单提交行为
+
+        // 获取日期和早晚打卡时间
+        const date = document.getElementById('date').value;
+        const morningTime = document.getElementById('morningTime').value;
+        const eveningTime = document.getElementById('eveningTime').value;
+
+        // 验证输入日期是否有效
+        if (date) {
+            // 组织打卡记录对象
+            const punchData = { date };
+
+            // 只保存输入了的打卡时间
+            if (morningTime) punchData.morningTime = morningTime;
+            if (eveningTime) punchData.eveningTime = eveningTime;
+
+            // 从localStorage中读取已有的打卡记录
+            let punchRecords = JSON.parse(localStorage.getItem('punchRecords')) || [];
+
+            // 查找并删除已有的相同日期的记录
+            punchRecords = punchRecords.filter(record => record.date !== date);
+
+            // 将新打卡记录添加到记录中
+            punchRecords.push(punchData);
+
+            // 将更新后的记录保存回localStorage
+            localStorage.setItem('punchRecords', JSON.stringify(punchRecords));
+
+            // 显示保存成功的消息
+            document.getElementById('result').innerText = '打卡时间已更新并保存！';
+        } else {
+            document.getElementById('result').innerText = '请输入有效的日期！';
+        }
+    });
+
+    // 监听查看/关闭历史按钮点击事件
+    let isHistoryVisible = false;
+    document.getElementById('toggleHistory').addEventListener('click', function() {
+        const historyDiv = document.getElementById('history');
+        if (isHistoryVisible) {
+            historyDiv.style.display = 'none';
+            document.getElementById('toggleHistory').innerText = '查看打卡历史';
+        } else {
+            displayHistory();
+            historyDiv.style.display = 'block';
+            document.getElementById('toggleHistory').innerText = '关闭打卡历史';
+        }
+        isHistoryVisible = !isHistoryVisible;
+    });
+
+    // 显示历史记录并添加删除按钮
+    function displayHistory() {
+        let historyDiv = document.getElementById('history');
+        historyDiv.innerHTML = '';  // 清空历史记录显示区域
+
+        // 从localStorage中获取所有的打卡记录
+        let punchRecords = JSON.parse(localStorage.getItem('punchRecords')) || [];
+
+        if (punchRecords.length === 0) {
+            historyDiv.innerText = '没有找到打卡历史记录。';
+        } else {
+            punchRecords.forEach((record, index) => {
+                let recordMessage = `日期：${record.date}`;
+                if (record.morningTime) recordMessage += `, 早上打卡：${record.morningTime}`;
+                if (record.eveningTime) recordMessage += `, 晚上打卡：${record.eveningTime}`;
+                historyDiv.innerHTML += `<p>${recordMessage} <button class="delete-button" onclick="deleteRecord(${index})">删除</button></p >`;
+            });
+        }
+    }
+
+    // 删除记录功能
+    function deleteRecord(index) {
+        let punchRecords = JSON.parse(localStorage.getItem('punchRecords')) || [];
+        punchRecords.splice(index, 1);  // 删除指定索引的记录
+        localStorage.setItem('punchRecords', JSON.stringify(punchRecords));  // 保存更新后的记录
+        displayHistory();  // 重新显示历史记录
+        document.getElementById('result').innerText = '打卡记录已删除！';
+    }
+
+    // 计算时间差（分钟）
+    function calculateTimeDifference(laterTime, earlierTime) {
+        const [laterHour, laterMinute] = laterTime.split(':').map(Number);
+        const [earlierHour, earlierMinute] = earlierTime.split(':').map(Number);
+
+        const laterDate = new Date(0, 0, 0, laterHour, laterMinute);
+        const earlierDate = new Date(0, 0, 0, earlierHour, earlierMinute);
+
+        return Math.floor((laterDate - earlierDate) / (1000 * 60));  // 转换为分钟
+    }
+
+    // 计算当月的迟到和加班时长
+    document.getElementById('calculateMonth').addEventListener('click', function() {
+        let punchRecords = JSON.parse(localStorage.getItem('punchRecords')) || [];
+        let totalLateMinutes = 0;
+        let totalOvertimeMinutes = 0;
+
+        const lateThreshold = "08:30";
+        const overtimeThreshold = "18:30";
+
+        punchRecords.forEach(record => {
+            const { morningTime, eveningTime } = record;
+
+            // 计算迟到时长
+            if (morningTime && morningTime > lateThreshold) {
+                totalLateMinutes += calculateTimeDifference(morningTime, lateThreshold);
+            }
+
+            // 计算加班时长
+            if (eveningTime && eveningTime > overtimeThreshold) {
+                totalOvertimeMinutes += calculateTimeDifference(eveningTime, overtimeThreshold);
+            }
+        });
+
+        let summaryDiv = document.getElementById('monthlySummary');
+        summaryDiv.innerHTML = '';  // 清空之前的结果
+
+        // 计算抵消后的结果
+        if (totalOvertimeMinutes > totalLateMinutes) {
+            const finalOvertime = totalOvertimeMinutes - totalLateMinutes;
+            summaryDiv.innerHTML = `<p>本月总加班时长：${finalOvertime} 分钟</p >`;
+        } else if (totalLateMinutes > totalOvertimeMinutes) {
+            const finalLate = totalLateMinutes - totalOvertimeMinutes;
+            summaryDiv.innerHTML = `<p>本月总迟到时长：${finalLate} 分钟</p >`;
+        } else {
+            summaryDiv.innerHTML = `<p>本月没有迟到或加班时长。</p >`;
+        }
+    });
+</script>
+
+</body>
+</html>
